@@ -36,7 +36,28 @@ sealer扮演一个客户端的角色，通过Restful API接口与远端的镜像
 选取想要的Platform对应的digest，用该digest发起一个http GET请求，获取到指定镜像的manifest，镜像的manifest中包含了所有layer的digest和config的digest。下图是一个manifest的部分内容：
 ![image](https://user-images.githubusercontent.com/53456509/149660674-3152f910-37a5-41da-9b9f-991cf8a4d520.png)
 
-最后，发起一系列的http GET请求，获取仓库中所有的digest对应的blob，并存储到本地。
+最后，发起一系列的http GET请求，获取仓库中所有的digest对应的blob，并存储到CloudImage中。
 
+注意，docker镜像和OCI镜像的manifest list的mediaType值以及manifest 的mediaType值并不相同，出于兼容性的考虑，sealer对两者都提供了支持，他们之间的区别如下:
+
+####OCI使用的mediaType
+
+```
+manifest list mediaType： application/vnd.oci.image.index.v1+json
+manifest mediaType: application/vnd.oci.image.manifest.v1+json
+```
+
+####docker使用的mediaType
+
+```
+manifest list mediaType: application/vnd.docker.distribution.manifest.list.v2+json
+manifest mediaType: application/vnd.docker.distribution.manifest.v2+json
+```
+
+此外，sealer对于mediaType为空但其余部分符合OCI规定的镜像标准的镜像也提供支持，例如helm chart包，下图是一个helm chart包的manifest示例：
+
+![image](https://user-images.githubusercontent.com/53456509/149661231-092a0a9f-b278-4a20-8ef8-0e9dd71790b6.png)
+
+仔细观察，图中虽然有两个mediaType字段，但并不是manifest的mediaType值，而是两个blob的mediaType值。对于mediaType为空的情况，sealer会首先判断其是否是一个包含了多个manifest的list，然后获取相应的manifest的digest，进而获取所有blob的digest，最后存储blob数据到CloudImage中。
 
 ### 核心代码实现
