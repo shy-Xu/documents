@@ -7,6 +7,7 @@
 一开始，sealer在build 时选择了依赖docker的方式来将镜像存储在CloudImage中，build之前要有运行中的docker daemon进程。在sealer内部，调用docker的sdk来拉取所需的镜像。其工作流程如下图所示：
 
 ![image](https://user-images.githubusercontent.com/53456509/149660455-edda865b-eb97-408a-ba5a-4f9615b28f76.png)
+
 图中所使用的docker daemon是sealer修改过的，sealer修改后的docker daemon把sea.hub做为代理仓库，所有镜像的拉取都会先拉取到代理仓库sea.hub中，然后再从sea.hub仓库拉取到本地。sea.hub实质上是一个docker容器，其存储镜像的目录与CloudImage的文件系统是相通的。所以，此种情况下，sealer只用执行一个动作就可以把镜像缓存到CloudImage中。
 在实际的应用场景中，有些集群使用原生的docker做为容器运行时，此时，sealer在build过程中的工作流程如下图所示：
 
@@ -25,15 +26,18 @@
 ### 工作流程总览
 
 随着sealer应用场景的增加，用户需求的增多，原有的将镜像存储到CloudImage的方式显得稍有臃肿。sealer希望通过一个简洁而又高效的设计统一所有的应用场景，优化镜像存储到CloudImage的效率。image save模式的工作流程如下图所示：
+
 ![image](https://user-images.githubusercontent.com/53456509/149660641-8fc54011-cf1d-4fce-add4-c2d63f748337.png)
 
 sealer扮演一个客户端的角色，通过Restful API接口与远端的镜像仓库建立http通信，请求镜像数据。然后内部实现了镜像存储逻辑，将镜像仓库响应的镜像数据直接存储到CloudImage中。该种设计极大的简化了镜像存储逻辑，克服了原有模式的所有弊端。
 
 ### OCI镜像介绍
 当我们要从一个符合OCI标准的仓库中拉取镜像时，首先要与对应registry的对应repository建立链接，然后根据tag从repository中获取manifest list。manifest list中包含了该tag对应的所有Platform的镜像digest。下图是一个manifest list的部分内容：
+
 ![image](https://user-images.githubusercontent.com/53456509/149660663-bd30d612-4270-4493-b263-9ed3f1ec2d17.png)
 
 选取想要的Platform对应的digest，用该digest发起一个http GET请求，获取到指定镜像的manifest，镜像的manifest中包含了所有layer的digest和config的digest。下图是一个manifest的部分内容：
+
 ![image](https://user-images.githubusercontent.com/53456509/149660674-3152f910-37a5-41da-9b9f-991cf8a4d520.png)
 
 最后，发起一系列的http GET请求，获取仓库中所有的digest对应的blob，并存储到CloudImage中。
