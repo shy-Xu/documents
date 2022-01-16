@@ -5,10 +5,11 @@
 使用构建好的CloudImage成功启动一个k8s集群后，docker镜像，helm chart包已经存在于私有仓库中，这一方面提升了镜像拉取效率，另一方面减少了与外部网络的通信，保障了集群的安全性。
 ## image save模式出现之前
 一开始，sealer在build 时选择了依赖docker的方式来将镜像存储在CloudImage中，build之前要有运行中的docker daemon进程。在sealer内部，调用docker的sdk来拉取所需的镜像。其工作流程如下图所示：
-![image](https://user-images.githubusercontent.com/53456509/149660455-edda865b-eb97-408a-ba5a-4f9615b28f76.png)
 
+![image](https://user-images.githubusercontent.com/53456509/149660455-edda865b-eb97-408a-ba5a-4f9615b28f76.png)
 图中所使用的docker daemon是sealer修改过的，sealer修改后的docker daemon把sea.hub做为代理仓库，所有镜像的拉取都会先拉取到代理仓库sea.hub中，然后再从sea.hub仓库拉取到本地。sea.hub实质上是一个docker容器，其存储镜像的目录与CloudImage的文件系统是相通的。所以，此种情况下，sealer只用执行一个动作就可以把镜像缓存到CloudImage中。
 在实际的应用场景中，有些集群使用原生的docker做为容器运行时，此时，sealer在build过程中的工作流程如下图所示：
+
 ![image](https://user-images.githubusercontent.com/53456509/149660482-1781178c-4387-48f1-9a5f-9e62971b6001.png)
 
 在原生docker的场景下，sea.hub不在具有代理仓库的角色，仅仅具有普通私有仓库的功能。因此，所有的镜像需要先执行一次拉取动作，保存镜像到本地文件系统中，然后再执行一次推送动作，把镜像存储到sea.hub中，也即存储到CloudImage中。
