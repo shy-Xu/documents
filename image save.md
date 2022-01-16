@@ -40,14 +40,14 @@ sealer扮演一个客户端的角色，通过Restful API接口与远端的镜像
 
 注意，docker镜像和OCI镜像的manifest list的mediaType值以及manifest 的mediaType值并不相同，出于兼容性的考虑，sealer对两者都提供了支持，他们之间的区别如下:
 
-####OCI使用的mediaType
+#### OCI使用的mediaType
 
 ```
 manifest list mediaType： application/vnd.oci.image.index.v1+json
 manifest mediaType: application/vnd.oci.image.manifest.v1+json
 ```
 
-####docker使用的mediaType
+#### docker使用的mediaType
 
 ```
 manifest list mediaType: application/vnd.docker.distribution.manifest.list.v2+json
