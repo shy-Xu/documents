@@ -1,5 +1,6 @@
 ## 背景介绍
 在专有云领域，sealer可以帮助用户构建出他们自己想要的镜像（sealer称之为"CloudImage"），创建出用户专属的k8s集群。在构建CloudImage的过程中，sealer会帮用户把需要的所有依赖打包，以使得构建出来的CloudImage可以在任何场景中使用。这些依赖其中就包括一些不同CPU架构的docker镜像，helm chart包等，sealer把它们存储到构建出来的CloudImage的私有仓库中，它们之间的关系如下图所示：
+![image](https://user-images.githubusercontent.com/53456509/149660147-b220816d-a4bc-4f5a-85f8-dae026d251f2.png)
 
 使用构建好的CloudImage成功启动一个k8s集群后，docker镜像，helm chart包已经存在于私有仓库中，这一方面提升了镜像拉取效率，另一方面减少了与外部网络的通信，保障了集群的安全性。
 ## image save模式出现之前
