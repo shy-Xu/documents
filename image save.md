@@ -15,7 +15,7 @@
 
 在原生docker的场景下，sea.hub不在具有代理仓库的角色，仅仅具有普通私有仓库的功能。因此，所有的镜像需要先执行一次拉取动作，保存镜像到本地文件系统中，然后再执行一次推送动作，把镜像存储到sea.hub中，也即存储到CloudImage中。
 
-原生docker的场景相比sealer docker场景，还有另外一个问题：建立起k8s集群后，用户所创建的pod中容器所使用的镜像可能并不是CloudImage内置的私有仓库的镜像。例如，在一个pod的yaml文件中声明改pod使用`mysql:latest`镜像，本意是想使用sea.hub/library/mysql:latest 镜像，实际情况下使用的镜像是docker.io/library/mysql:latest 。针对这个问题，sealer在以原生docker做为容器运行时的CloudImage中整合了webhook技术，来控制pod中镜像的来源，sealer所选择的webhook工具是kyverno，kyverno在k8s集群中的角色是一个动态准许加入控制器(dynamic admission controller)，它可以拦截到k8s集群中组件与kube-apiserver之间的通信，同时对k8s集群管理者暴露了一组规则和策略，通过自定义规则和策略，达到动态控制集群资源的效果。
+原生docker的场景相比sealer docker场景，还有另外一个问题：建立起k8s集群后，用户所创建的pod中容器所使用的镜像可能并不是CloudImage内置的私有仓库的镜像。例如，在一个pod的yaml文件中声明改pod使用`mysql:latest`镜像，本意是想使用`sea.hub/library/mysql:latest` 镜像，实际情况下使用的镜像是`docker.io/library/mysql:latest` 。针对这个问题，sealer在以原生docker做为容器运行时的CloudImage中整合了webhook技术，来控制pod中镜像的来源，sealer所选择的webhook工具是kyverno，kyverno在k8s集群中的角色是一个动态准许加入控制器(dynamic admission controller)，它可以拦截到k8s集群中组件与kube-apiserver之间的通信，同时对k8s集群管理者暴露了一组规则和策略，通过自定义规则和策略，达到动态控制集群资源的效果。
 
 ![DD557B1F-FA9F-439f-A184-4B96AD6E2CDF](https://user-images.githubusercontent.com/53456509/149702962-e2b2b23e-638f-44b2-8f77-8e58b239b032.png)
 
