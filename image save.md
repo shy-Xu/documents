@@ -65,3 +65,71 @@ manifest mediaType: application/vnd.docker.distribution.manifest.v2+json
 仔细观察，图中虽然有两个mediaType字段，但并不是manifest的mediaType值，而是两个blob的mediaType值。对于mediaType为空的情况，sealer会首先判断其是否是一个包含了多个manifest的list，然后获取相应的manifest的digest，进而获取所有blob的digest，最后存储blob数据到CloudImage中。
 
 ### 核心代码实现
+
+image save模块的功能在实现时，主要参考了开源项目 https://github.com/distribution/distribution 的实现原理，将distribution中关于镜像的拉取逻辑的代码和镜像的存储逻辑的代码分离出来，加以修改然后进行复用。首先是registry结构体，该结构体的定义如下：
+
+```
+type proxyingRegistry struct {
+	embedded       distribution.Namespace // provides local registry functionality
+	scheduler      *scheduler.TTLExpirationScheduler
+	remoteURL      url.URL
+	authChallenger authChallenger
+}
+```
+其中，`remoteURL`是远端仓库的地址，`authChallenger`用于与远端仓库建立链接时候的认证，`scheduler`并没有在sealer中使用，`embedded`是一个`distribution.Namespace`接口类型的对象，在sealer中起到存储镜像数据的作用。
+`distribution.Namespace`接口类型的详细定义如下：
+```
+type Namespace interface {
+	Scope() Scope
+
+	Repository(ctx context.Context, name reference.Named) (Repository, error)
+
+	Repositories(ctx context.Context, repos []string, last string) (n int, err error)
+
+	Blobs() BlobEnumerator
+
+	BlobStatter() BlobStatter
+}
+```
+`Repository`函数接收两个参数，一个是`context.Context`类型，代表当前运行环境上下文，一个是`reference.Named`类型，代表`repository`的名字，例如: `library/ubuntu`,`Repository`函数能够根据`reference.Named`参数的值返回相应的`distribution.Repository`接口类型的对象，对于`proxyingRegistry`这个结构体对象而言，它调用`Repository`函数返回的对象其实是一个名为`proxiedRepository`的结构体，如下所示：
+
+```
+type proxiedRepository struct {
+	blobStore distribution.BlobStore
+	manifests distribution.ManifestService
+	name      reference.Named
+	tags      distribution.TagService
+}
+```
+
+其中，`name`就是该`repository`的名字，而`tags`实现了接下来存储镜像数据时对`tag`的处理逻辑,`manifests`,`blobStore`分别实现了接下来存储镜像数据时对`manifest`,`blob`的处理逻辑。sealer对于它们的使用方式大致相同，因此选取`manifest`处理逻辑进行说明，`tag`和`blob`的处理逻辑可类比`manifest`。
+
+sealer中，`manifest`处理代码的核心代码如下：
+
+```
+manifest, err := localManifests.Get(ctx, dgst, options...)
+	if err != nil {
+		if err := authChallenger.tryEstablishChallenges(ctx); err != nil {
+			return nil, err
+		}
+
+		manifest, err = remoteManifests.Get(ctx, dgst, options...)
+		if err != nil {
+			return nil, err
+		}
+		fromRemote = true
+	}
+
+	if fromRemote {
+		_, err = localManifests.Put(ctx, manifest)
+		if err != nil {
+			return nil, err
+		}
+  }
+  
+  return manifest, err
+```
+
+首先，尝试从本地文件系统中获取digest对应的manifest，如果成功得话，就证明本地已经存在该manifest，不会再去向远端仓库发起http Get请求，直接返回得到得manifest。如果失败，则首先与远端仓库进行认证，认证成功之后，发起http Get请求，从远端仓库中获取digest对应的manifest，然后把`fromRemote`这个bool变量的值置为`true`。接下来，会进入由`fromRemote`做为判断条件的if语句块的内部，把获取到的manifest存储到本地文件系统中。
+
+
