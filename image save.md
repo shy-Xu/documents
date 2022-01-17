@@ -59,14 +59,15 @@ spec:
 
 该策略匹配所有的pod，对于每一个kind字段的值是pod的请求，修改其中的spec.containers字段和spec.initContainers字段，将image的路径中registry值修改为sea.hub:5000，也即CloudImage中的私有仓库的URL地址。因此，用户所创建的所有pod，在kyverno的控制下，都会使用私有仓库中的镜像。
 
-该存储方式的逻辑原理比较简单，但是也有很多的弊端存在：
+## image save模式
+
+原有的镜像缓存模式逻辑原理比较简单，容易实现。但是也有很多的弊端存在：
 1. 依赖过多。需要有运行中的docker daemon，需要有处于运行状态的registry容器。
 1. 要适应不同的情况。要针对sealer docker的情景和原生docker的情景做不同的处理，且未来出现新的情景时还可能需要增添对新情景的处理，无法做到容器运行时的统一。
 1. 效率低下。其实sealer的最终目的是要把镜像存储到CloudImage中，但无论是sealer docker的场景还是原生docker的场景，整个流程中都有一些不必要的额外步骤。
 1. 扩展性不好。不能够支持其他的符合OCI标准的镜像，也不能支持helm chart包。
 
-## image save模式
-
+针对以上问题，sealer演进出了一种新的镜像缓存模式，给用户提供更加优良的体验。
 ### 工作流程总览
 
 随着sealer应用场景的增加，用户需求的增多，原有的将镜像存储到CloudImage的方式显得稍有臃肿。sealer希望通过一个简洁而又高效的设计统一所有的应用场景，优化镜像存储到CloudImage的效率。image save模式的工作流程如下图所示：
