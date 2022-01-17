@@ -15,6 +15,50 @@
 
 在原生docker的场景下，sea.hub不在具有代理仓库的角色，仅仅具有普通私有仓库的功能。因此，所有的镜像需要先执行一次拉取动作，保存镜像到本地文件系统中，然后再执行一次推送动作，把镜像存储到sea.hub中，也即存储到CloudImage中。
 
+原生docker的场景相比sealer docker场景，还有另外一个问题：建立起k8s集群后，用户所创建的pod中容器所使用的镜像可能并不是CloudImage内置的私有仓库的镜像。例如，在一个pod的yaml文件中声明改pod使用`mysql:latest`镜像，本意是想使用sea.hub/library/mysql:latest 镜像，实际情况下使用的镜像是docker.io/library/mysql:latest 。针对这个问题，sealer在以原生docker做为容器运行时的CloudImage中整合了webhook技术，来控制pod中镜像的来源，sealer所选择的webhook工具是kyverno，kyverno在k8s集群中的角色是一个动态准许加入控制器(dynamic admission controller)，它可以拦截到k8s集群中组件与kube-apiserver之间的通信，同时对k8s集群管理者暴露了一组规则和策略，通过自定义规则和策略，达到动态控制集群资源的效果。
+
+![DD557B1F-FA9F-439f-A184-4B96AD6E2CDF](https://user-images.githubusercontent.com/53456509/149702962-e2b2b23e-638f-44b2-8f77-8e58b239b032.png)
+
+kyverno暴露的策略主要包括两种，一种是修改策略，一种是验证策略。k8s集群管理者通过验证策略来拒绝不符合要求的资源加入k8s集群中，通过修改策略来控制k8s集群的资源符合自己的需求。sealer使用的是kyverno中的修改策略。具体如下：
+
+```
+  apiVersion : kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: redirect-registry
+spec:
+  background: false
+  rules:
+  - name: prepend-registry-containers
+    match:
+      resources:
+        kinds:
+        - Pod
+    mutate:
+      foreach:
+      - list: "request.object.spec.containers"
+        patchStrategicMerge:
+          spec:
+            containers:
+            - name: "{{ element.name }}"
+              image: "sea.hub:5000/{{ images.containers.{{element.name}}.path}}:{{images.containers.{{element.name}}.tag}}"
+  - name: prepend-registry-initcontainers
+    match:
+      resources:
+        kinds:
+        - Pod
+    mutate:
+      foreach:
+      - list: "request.object.spec.initContainers"
+        patchStrategicMerge:
+          spec:
+            initContainers:
+            - name: "{{ element.name }}"
+              image: "sea.hub:5000/{{ images.initContainers.{{element.name}}.path}}:{{images.initContainers.{{element.name}}.tag}}"
+```
+
+该策略匹配所有的pod，对于每一个kind字段的值是pod的请求，修改其中的spec.containers字段和spec.initContainers字段，将image的路径中registry值修改为sea.hub:5000，也即CloudImage中的私有仓库的URL地址。因此，用户所创建的所有pod，在kyverno的控制下，都会使用私有仓库中的镜像。
+
 该存储方式的逻辑原理比较简单，但是也有很多的弊端存在：
 1. 依赖过多。需要有运行中的docker daemon，需要有处于运行状态的registry容器。
 1. 要适应不同的情况。要针对sealer docker的情景和原生docker的情景做不同的处理，且未来出现新的情景时还可能需要增添对新情景的处理，无法做到容器运行时的统一。
